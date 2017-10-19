@@ -1,4 +1,4 @@
-add_library(ocdflashnor 
+add_library(ocdflashnor
 	aduc702x.c
 	aducm360.c
 	ambiqmicro.c
@@ -50,4 +50,5 @@ add_library(ocdflashnor
 	tms470.c
 	virtual.c
 	xmc1xxx.c
-	xmc4xxx.c)
+	xmc4xxx.c
+	fespi.c)

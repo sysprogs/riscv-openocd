@@ -26,7 +26,7 @@
         <HostName>BuildMachine</HostName>
         <Transport>BuiltinShortcut</Transport>
       </RemoteHost>
-      <Command>E:\sysgcc\arm-eabi\bin\make.exe</Command>
+      <Command>$(ToolchainMake)</Command>
       <Arguments>$(ToolchainMakeArgs)</Arguments>
       <WorkingDirectory>$(BuildDir)</WorkingDirectory>
       <Environment>
@@ -51,6 +51,7 @@
     <ExportCompileCommands>true</ExportCompileCommands>
     <DisableToolchainFile>false</DisableToolchainFile>
     <ExtraModuleDirectories />
+    <CMakeMakefileType>MinGW Makefiles</CMakeMakefileType>
     <ProjectModeSettings>
       <ProjectItemSettings>
         <GroupSourcesByTypes>true</GroupSourcesByTypes>
