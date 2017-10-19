@@ -9,7 +9,6 @@
 *.a
 *.lo
 *.la
-*.in
 
 # generated source files
 src/jtag/minidriver_imp.h
@@ -61,7 +60,6 @@ src/openocd.exe
 aclocal.m4
 autom4te.cache
 compile
-config.*
 configure
 depcomp
 doxygen
