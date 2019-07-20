@@ -30,7 +30,6 @@ add_library(ocdflashnor
 	mrvlqspi.c
 	niietcm4.c
 	non_cfi.c
-	nrf51.c
 	numicro.c
 	ocl.c
 	pic32mx.c
@@ -51,4 +50,17 @@ add_library(ocdflashnor
 	virtual.c
 	xmc1xxx.c
 	xmc4xxx.c
-	fespi.c)
+	fespi.c
+	atsame5.c
+	bluenrg-x.c
+	cc26xx.c
+	cc3220sf.c
+	esirisc_flash.c
+	max32xxx.c
+	msp432.c
+	nrf5.c
+	psoc5lp.c
+	psoc6.c
+	stm32h7x.c
+	w600.c
+	xcf.c)

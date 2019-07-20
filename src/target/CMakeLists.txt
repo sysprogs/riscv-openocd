@@ -85,6 +85,15 @@ add_library(target
 	riscv/program.c
 	riscv/riscv.c
 	riscv/riscv-011.c
-	riscv/riscv-013.c)
+	riscv/riscv-013.c
+	semihosting_common.c
+	riscv/riscv_semihosting.c
+	esirisc.c
+	esirisc_jtag.c
+	esirisc_trace.c
+	stm8.c
+	mem_ap.c
+	armv7a_mmu.c
+	arm_dap.c)
 	
 SET_TARGET_PROPERTIES(target PROPERTIES COMPILE_FLAGS -I${CMAKE_CURRENT_BINARY_DIR})

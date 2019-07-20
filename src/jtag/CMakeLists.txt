@@ -23,6 +23,7 @@ add_library(ocdjtagdrivers STATIC
 	drivers/driver.c
 	drivers/libusb1_common.c
 	drivers/usb_common.c
+	drivers/jtag_usb_common.c
 	drivers/ftdi.c
 	drivers/mpsse.c
 	drivers/usbprog.c
@@ -63,7 +64,14 @@ add_library(ocdjlink STATIC
 	drivers/libjaylink/libjaylink/target.c
 	drivers/libjaylink/libjaylink/transport.c
 	drivers/libjaylink/libjaylink/util.c
-	drivers/libjaylink/libjaylink/version.c) 
+	drivers/libjaylink/libjaylink/version.c
+	drivers/libjaylink/libjaylink/discovery_tcp.c
+	drivers/libjaylink/libjaylink/discovery_usb.c
+	drivers/libjaylink/libjaylink/socket.c
+	drivers/libjaylink/libjaylink/transport_tcp.c
+	drivers/libjaylink/libjaylink/transport_usb.c)
+
+target_compile_definitions(ocdjlink PRIVATE HAVE_LIBUSB)
 	
 add_library(jtag STATIC adapter.c core.c interface.c interfaces.c tcl.c commands.c)
 
