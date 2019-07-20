@@ -8,6 +8,9 @@
  *   Copyright (C) 2008 by Oyvind Harboe                                   *
  *   oyvind.harboe@zylin.com                                               *
  *                                                                         *
+ *   Copyright (C) 2018 by Liviu Ionescu                                   *
+ *   <ilg@livius.net>                                                      *
+ *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
  *   the Free Software Foundation; either version 2 of the License, or     *
@@ -34,6 +37,7 @@
 #include <helper/binarybuffer.h>
 #include "algorithm.h"
 #include "register.h"
+#include "semihosting_common.h"
 
 /* offsets into armv4_5 core register cache */
 enum {
@@ -340,6 +344,50 @@ static const struct {
 
 };
 
+static const struct {
+	unsigned int id;
+	const char *name;
+	uint32_t bits;
+	enum arm_mode mode;
+	enum reg_type type;
+	const char *group;
+	const char *feature;
+} arm_vfp_v3_regs[] = {
+	{ ARM_VFP_V3_D0,  "d0",  64, ARM_MODE_ANY, REG_TYPE_IEEE_DOUBLE, NULL, "org.gnu.gdb.arm.vfp"},
+	{ ARM_VFP_V3_D1,  "d1",  64, ARM_MODE_ANY, REG_TYPE_IEEE_DOUBLE, NULL, "org.gnu.gdb.arm.vfp"},
+	{ ARM_VFP_V3_D2,  "d2",  64, ARM_MODE_ANY, REG_TYPE_IEEE_DOUBLE, NULL, "org.gnu.gdb.arm.vfp"},
+	{ ARM_VFP_V3_D3,  "d3",  64, ARM_MODE_ANY, REG_TYPE_IEEE_DOUBLE, NULL, "org.gnu.gdb.arm.vfp"},
+	{ ARM_VFP_V3_D4,  "d4",  64, ARM_MODE_ANY, REG_TYPE_IEEE_DOUBLE, NULL, "org.gnu.gdb.arm.vfp"},
+	{ ARM_VFP_V3_D5,  "d5",  64, ARM_MODE_ANY, REG_TYPE_IEEE_DOUBLE, NULL, "org.gnu.gdb.arm.vfp"},
+	{ ARM_VFP_V3_D6,  "d6",  64, ARM_MODE_ANY, REG_TYPE_IEEE_DOUBLE, NULL, "org.gnu.gdb.arm.vfp"},
+	{ ARM_VFP_V3_D7,  "d7",  64, ARM_MODE_ANY, REG_TYPE_IEEE_DOUBLE, NULL, "org.gnu.gdb.arm.vfp"},
+	{ ARM_VFP_V3_D8,  "d8",  64, ARM_MODE_ANY, REG_TYPE_IEEE_DOUBLE, NULL, "org.gnu.gdb.arm.vfp"},
+	{ ARM_VFP_V3_D9,  "d9",  64, ARM_MODE_ANY, REG_TYPE_IEEE_DOUBLE, NULL, "org.gnu.gdb.arm.vfp"},
+	{ ARM_VFP_V3_D10, "d10", 64, ARM_MODE_ANY, REG_TYPE_IEEE_DOUBLE, NULL, "org.gnu.gdb.arm.vfp"},
+	{ ARM_VFP_V3_D11, "d11", 64, ARM_MODE_ANY, REG_TYPE_IEEE_DOUBLE, NULL, "org.gnu.gdb.arm.vfp"},
+	{ ARM_VFP_V3_D12, "d12", 64, ARM_MODE_ANY, REG_TYPE_IEEE_DOUBLE, NULL, "org.gnu.gdb.arm.vfp"},
+	{ ARM_VFP_V3_D13, "d13", 64, ARM_MODE_ANY, REG_TYPE_IEEE_DOUBLE, NULL, "org.gnu.gdb.arm.vfp"},
+	{ ARM_VFP_V3_D14, "d14", 64, ARM_MODE_ANY, REG_TYPE_IEEE_DOUBLE, NULL, "org.gnu.gdb.arm.vfp"},
+	{ ARM_VFP_V3_D15, "d15", 64, ARM_MODE_ANY, REG_TYPE_IEEE_DOUBLE, NULL, "org.gnu.gdb.arm.vfp"},
+	{ ARM_VFP_V3_D16, "d16", 64, ARM_MODE_ANY, REG_TYPE_IEEE_DOUBLE, NULL, "org.gnu.gdb.arm.vfp"},
+	{ ARM_VFP_V3_D17, "d17", 64, ARM_MODE_ANY, REG_TYPE_IEEE_DOUBLE, NULL, "org.gnu.gdb.arm.vfp"},
+	{ ARM_VFP_V3_D18, "d18", 64, ARM_MODE_ANY, REG_TYPE_IEEE_DOUBLE, NULL, "org.gnu.gdb.arm.vfp"},
+	{ ARM_VFP_V3_D19, "d19", 64, ARM_MODE_ANY, REG_TYPE_IEEE_DOUBLE, NULL, "org.gnu.gdb.arm.vfp"},
+	{ ARM_VFP_V3_D20, "d20", 64, ARM_MODE_ANY, REG_TYPE_IEEE_DOUBLE, NULL, "org.gnu.gdb.arm.vfp"},
+	{ ARM_VFP_V3_D21, "d21", 64, ARM_MODE_ANY, REG_TYPE_IEEE_DOUBLE, NULL, "org.gnu.gdb.arm.vfp"},
+	{ ARM_VFP_V3_D22, "d22", 64, ARM_MODE_ANY, REG_TYPE_IEEE_DOUBLE, NULL, "org.gnu.gdb.arm.vfp"},
+	{ ARM_VFP_V3_D23, "d23", 64, ARM_MODE_ANY, REG_TYPE_IEEE_DOUBLE, NULL, "org.gnu.gdb.arm.vfp"},
+	{ ARM_VFP_V3_D24, "d24", 64, ARM_MODE_ANY, REG_TYPE_IEEE_DOUBLE, NULL, "org.gnu.gdb.arm.vfp"},
+	{ ARM_VFP_V3_D25, "d25", 64, ARM_MODE_ANY, REG_TYPE_IEEE_DOUBLE, NULL, "org.gnu.gdb.arm.vfp"},
+	{ ARM_VFP_V3_D26, "d26", 64, ARM_MODE_ANY, REG_TYPE_IEEE_DOUBLE, NULL, "org.gnu.gdb.arm.vfp"},
+	{ ARM_VFP_V3_D27, "d27", 64, ARM_MODE_ANY, REG_TYPE_IEEE_DOUBLE, NULL, "org.gnu.gdb.arm.vfp"},
+	{ ARM_VFP_V3_D28, "d28", 64, ARM_MODE_ANY, REG_TYPE_IEEE_DOUBLE, NULL, "org.gnu.gdb.arm.vfp"},
+	{ ARM_VFP_V3_D29, "d29", 64, ARM_MODE_ANY, REG_TYPE_IEEE_DOUBLE, NULL, "org.gnu.gdb.arm.vfp"},
+	{ ARM_VFP_V3_D30, "d30", 64, ARM_MODE_ANY, REG_TYPE_IEEE_DOUBLE, NULL, "org.gnu.gdb.arm.vfp"},
+	{ ARM_VFP_V3_D31, "d31", 64, ARM_MODE_ANY, REG_TYPE_IEEE_DOUBLE, NULL, "org.gnu.gdb.arm.vfp"},
+	{ ARM_VFP_V3_FPSCR, "fpscr", 32, ARM_MODE_ANY, REG_TYPE_INT, "float", "org.gnu.gdb.arm.vfp"},
+};
+
 /* map core mode (USR, FIQ, ...) and register number to
  * indices into the register cache
  */
@@ -386,8 +434,8 @@ void arm_set_cpsr(struct arm *arm, uint32_t cpsr)
 	 */
 	if (arm->cpsr) {
 		buf_set_u32(arm->cpsr->value, 0, 32, cpsr);
-		arm->cpsr->valid = 1;
-		arm->cpsr->dirty = 0;
+		arm->cpsr->valid = true;
+		arm->cpsr->dirty = false;
 	}
 
 	arm->core_mode = mode;
@@ -478,7 +526,7 @@ static struct reg_feature arm_gdb_dummy_fp_features = {
 struct reg arm_gdb_dummy_fp_reg = {
 	.name = "GDB dummy FPA register",
 	.value = (uint8_t *) arm_gdb_dummy_fp_value,
-	.valid = 1,
+	.valid = true,
 	.size = 96,
 	.exist = false,
 	.number = 16,
@@ -495,7 +543,7 @@ static const uint8_t arm_gdb_dummy_fps_value[4];
 struct reg arm_gdb_dummy_fps_reg = {
 	.name = "GDB dummy FPA status register",
 	.value = (uint8_t *) arm_gdb_dummy_fps_value,
-	.valid = 1,
+	.valid = true,
 	.size = 32,
 	.exist = false,
 	.number = 24,
@@ -525,8 +573,8 @@ static int armv4_5_get_core_reg(struct reg *reg)
 	retval = reg_arch_info->arm->read_core_reg(target, reg,
 			reg_arch_info->num, reg_arch_info->mode);
 	if (retval == ERROR_OK) {
-		reg->valid = 1;
-		reg->dirty = 0;
+		reg->valid = true;
+		reg->dirty = false;
 	}
 
 	return retval;
@@ -567,9 +615,13 @@ static int armv4_5_set_core_reg(struct reg *reg, uint8_t *buf)
 		}
 	} else {
 		buf_set_u32(reg->value, 0, 32, value);
-		reg->valid = 1;
+		if (reg->size == 64) {
+			value = buf_get_u32(buf + 4, 0, 32);
+			buf_set_u32(reg->value + 4, 0, 32, value);
+		}
+		reg->valid = true;
 	}
-	reg->dirty = 1;
+	reg->dirty = true;
 
 	return ERROR_OK;
 }
@@ -582,6 +634,10 @@ static const struct reg_arch_type arm_reg_type = {
 struct reg_cache *arm_build_reg_cache(struct target *target, struct arm *arm)
 {
 	int num_regs = ARRAY_SIZE(arm_core_regs);
+	int num_core_regs = num_regs;
+	if (arm->arm_vfp_version == ARM_VFP_V3)
+		num_regs += ARRAY_SIZE(arm_vfp_v3_regs);
+
 	struct reg_cache *cache = malloc(sizeof(struct reg_cache));
 	struct reg *reg_list = calloc(num_regs, sizeof(struct reg));
 	struct arm_reg *reg_arch_info = calloc(num_regs, sizeof(struct arm_reg));
@@ -599,7 +655,7 @@ struct reg_cache *arm_build_reg_cache(struct target *target, struct arm *arm)
 	cache->reg_list = reg_list;
 	cache->num_regs = 0;
 
-	for (i = 0; i < num_regs; i++) {
+	for (i = 0; i < num_core_regs; i++) {
 		/* Skip registers this core doesn't expose */
 		if (arm_core_regs[i].mode == ARM_MODE_MON
 			&& arm->core_type != ARM_MODE_MON)
@@ -651,9 +707,38 @@ struct reg_cache *arm_build_reg_cache(struct target *target, struct arm *arm)
 		cache->num_regs++;
 	}
 
+	int j;
+	for (i = num_core_regs, j = 0; i < num_regs; i++, j++) {
+		reg_arch_info[i].num = arm_vfp_v3_regs[j].id;
+		reg_arch_info[i].mode = arm_vfp_v3_regs[j].mode;
+		reg_arch_info[i].target = target;
+		reg_arch_info[i].arm = arm;
+
+		reg_list[i].name = arm_vfp_v3_regs[j].name;
+		reg_list[i].number = arm_vfp_v3_regs[j].id;
+		reg_list[i].size = arm_vfp_v3_regs[j].bits;
+		reg_list[i].value = reg_arch_info[i].value;
+		reg_list[i].type = &arm_reg_type;
+		reg_list[i].arch_info = &reg_arch_info[i];
+		reg_list[i].exist = true;
+
+		reg_list[i].caller_save = false;
+
+		reg_list[i].reg_data_type = malloc(sizeof(struct reg_data_type));
+		reg_list[i].reg_data_type->type = arm_vfp_v3_regs[j].type;
+
+		reg_list[i].feature = malloc(sizeof(struct reg_feature));
+		reg_list[i].feature->name = arm_vfp_v3_regs[j].feature;
+
+		reg_list[i].group = arm_vfp_v3_regs[j].group;
+
+		cache->num_regs++;
+	}
+
 	arm->pc = reg_list + 15;
 	arm->cpsr = reg_list + ARMV4_5_CPSR;
 	arm->core_cache = cache;
+
 	return cache;
 }
 
@@ -667,7 +752,7 @@ int arm_arch_state(struct target *target)
 	}
 
 	/* avoid filling log waiting for fileio reply */
-	if (arm->semihosting_hit_fileio)
+	if (target->semihosting && target->semihosting->hit_fileio)
 		return ERROR_OK;
 
 	LOG_USER("target halted in %s state due to %s, current mode: %s\n"
@@ -677,8 +762,8 @@ int arm_arch_state(struct target *target)
 		arm_mode_name(arm->core_mode),
 		buf_get_u32(arm->cpsr->value, 0, 32),
 		buf_get_u32(arm->pc->value, 0, 32),
-		arm->is_semihosting ? ", semihosting" : "",
-		arm->is_semihosting_fileio ? " fileio" : "");
+		(target->semihosting && target->semihosting->is_active) ? ", semihosting" : "",
+		(target->semihosting && target->semihosting->is_fileio) ? " fileio" : "");
 
 	return ERROR_OK;
 }
@@ -1013,83 +1098,10 @@ static int jim_mcrmrc(Jim_Interp *interp, int argc, Jim_Obj * const *argv)
 	return JIM_OK;
 }
 
-COMMAND_HANDLER(handle_arm_semihosting_command)
-{
-	struct target *target = get_current_target(CMD_CTX);
-
-	if (target == NULL) {
-		LOG_ERROR("No target selected");
-		return ERROR_FAIL;
-	}
-
-	struct arm *arm = target_to_arm(target);
-
-	if (!is_arm(arm)) {
-		command_print(CMD_CTX, "current target isn't an ARM");
-		return ERROR_FAIL;
-	}
-
-	if (!arm->setup_semihosting) {
-		command_print(CMD_CTX, "semihosting not supported for current target");
-		return ERROR_FAIL;
-	}
-
-	if (CMD_ARGC > 0) {
-		int semihosting;
-
-		COMMAND_PARSE_ENABLE(CMD_ARGV[0], semihosting);
-
-		if (!target_was_examined(target)) {
-			LOG_ERROR("Target not examined yet");
-			return ERROR_FAIL;
-		}
-
-		if (arm->setup_semihosting(target, semihosting) != ERROR_OK) {
-			LOG_ERROR("Failed to Configure semihosting");
-			return ERROR_FAIL;
-		}
-
-		/* FIXME never let that "catch" be dropped! */
-		arm->is_semihosting = semihosting;
-	}
-
-	command_print(CMD_CTX, "semihosting is %s",
-		arm->is_semihosting
-		? "enabled" : "disabled");
-
-	return ERROR_OK;
-}
-
-COMMAND_HANDLER(handle_arm_semihosting_fileio_command)
-{
-	struct target *target = get_current_target(CMD_CTX);
-
-	if (target == NULL) {
-		LOG_ERROR("No target selected");
-		return ERROR_FAIL;
-	}
-
-	struct arm *arm = target_to_arm(target);
-
-	if (!is_arm(arm)) {
-		command_print(CMD_CTX, "current target isn't an ARM");
-		return ERROR_FAIL;
-	}
-
-	if (!arm->is_semihosting) {
-		command_print(CMD_CTX, "semihosting is not enabled");
-		return ERROR_FAIL;
-	}
-
-	if (CMD_ARGC > 0)
-		COMMAND_PARSE_ENABLE(CMD_ARGV[0], arm->is_semihosting_fileio);
-
-	command_print(CMD_CTX, "semihosting fileio is %s",
-		arm->is_semihosting_fileio
-		? "enabled" : "disabled");
-
-	return ERROR_OK;
-}
+extern __COMMAND_HANDLER(handle_common_semihosting_command);
+extern __COMMAND_HANDLER(handle_common_semihosting_fileio_command);
+extern __COMMAND_HANDLER(handle_common_semihosting_resumable_exit_command);
+extern __COMMAND_HANDLER(handle_common_semihosting_cmdline);
 
 static const struct command_registration arm_exec_command_handlers[] = {
 	{
@@ -1122,25 +1134,39 @@ static const struct command_registration arm_exec_command_handlers[] = {
 	},
 	{
 		.name = "mrc",
+		.mode = COMMAND_EXEC,
 		.jim_handler = &jim_mcrmrc,
 		.help = "read coprocessor register",
 		.usage = "cpnum op1 CRn CRm op2",
 	},
 	{
 		"semihosting",
-		.handler = handle_arm_semihosting_command,
+		.handler = handle_common_semihosting_command,
 		.mode = COMMAND_EXEC,
 		.usage = "['enable'|'disable']",
 		.help = "activate support for semihosting operations",
 	},
 	{
+		"semihosting_cmdline",
+		.handler = handle_common_semihosting_cmdline,
+		.mode = COMMAND_EXEC,
+		.usage = "arguments",
+		.help = "command line arguments to be passed to program",
+	},
+	{
 		"semihosting_fileio",
-		.handler = handle_arm_semihosting_fileio_command,
+		.handler = handle_common_semihosting_fileio_command,
 		.mode = COMMAND_EXEC,
 		.usage = "['enable'|'disable']",
 		.help = "activate support for semihosting fileio operations",
 	},
-
+	{
+		"semihosting_resexit",
+		.handler = handle_common_semihosting_resumable_exit_command,
+		.mode = COMMAND_EXEC,
+		.usage = "['enable'|'disable']",
+		.help = "activate support for semihosting resumable exit",
+	},
 	COMMAND_REGISTRATION_DONE
 };
 const struct command_registration arm_command_handlers[] = {
@@ -1153,6 +1179,20 @@ const struct command_registration arm_command_handlers[] = {
 	},
 	COMMAND_REGISTRATION_DONE
 };
+
+/*
+ * gdb for arm targets (e.g. arm-none-eabi-gdb) supports several variants
+ * of arm architecture. You can list them using the autocompletion of gdb
+ * command prompt by typing "set architecture " and then press TAB key.
+ * The default, selected automatically, is "arm".
+ * Let's use the default value, here, to make gdb-multiarch behave in the
+ * same way as a gdb for arm. This can be changed later on. User can still
+ * set the specific architecture variant with the gdb command.
+ */
+const char *arm_get_gdb_arch(struct target *target)
+{
+	return "arm";
+}
 
 int arm_get_gdb_reg_list(struct target *target,
 	struct reg **reg_list[], int *reg_list_size,
@@ -1186,6 +1226,10 @@ int arm_get_gdb_reg_list(struct target *target,
 
 	case REG_CLASS_ALL:
 		*reg_list_size = (arm->core_type != ARM_MODE_MON ? 48 : 51);
+		unsigned int list_size_core = *reg_list_size;
+		if (arm->arm_vfp_version == ARM_VFP_V3)
+			*reg_list_size += 33;
+
 		*reg_list = malloc(sizeof(struct reg *) * (*reg_list_size));
 
 		for (i = 0; i < 16; i++)
@@ -1205,6 +1249,12 @@ int arm_get_gdb_reg_list(struct target *target,
 		}
 		(*reg_list)[24] = &arm_gdb_dummy_fps_reg;
 		(*reg_list)[24]->size = 0;
+
+		if (arm->arm_vfp_version == ARM_VFP_V3) {
+			unsigned int num_core_regs = ARRAY_SIZE(arm_core_regs);
+			for (i = 0; i < 33; i++)
+				(*reg_list)[list_size_core + i] = &(arm->core_cache->reg_list[num_core_regs + i]);
+		}
 
 		return ERROR_OK;
 		break;
@@ -1305,6 +1355,8 @@ int armv4_5_run_algorithm_inner(struct target *target,
 	cpsr = buf_get_u32(arm->cpsr->value, 0, 32);
 
 	for (i = 0; i < num_mem_params; i++) {
+		if (mem_params[i].direction == PARAM_IN)
+			continue;
 		retval = target_write_buffer(target, mem_params[i].address, mem_params[i].size,
 				mem_params[i].value);
 		if (retval != ERROR_OK)
@@ -1312,6 +1364,9 @@ int armv4_5_run_algorithm_inner(struct target *target,
 	}
 
 	for (i = 0; i < num_reg_params; i++) {
+		if (reg_params[i].direction == PARAM_IN)
+			continue;
+
 		struct reg *reg = register_get_by_name(arm->core_cache, reg_params[i].reg_name, 0);
 		if (!reg) {
 			LOG_ERROR("BUG: register '%s' not found", reg_params[i].reg_name);
@@ -1344,8 +1399,8 @@ int armv4_5_run_algorithm_inner(struct target *target,
 			arm_algorithm_info->core_mode);
 		buf_set_u32(arm->cpsr->value, 0, 5,
 			arm_algorithm_info->core_mode);
-		arm->cpsr->dirty = 1;
-		arm->cpsr->valid = 1;
+		arm->cpsr->dirty = true;
+		arm->cpsr->valid = true;
 	}
 
 	/* terminate using a hardware or (ARMv5+) software breakpoint */
@@ -1415,14 +1470,14 @@ int armv4_5_run_algorithm_inner(struct target *target,
 			buf_set_u32(ARMV4_5_CORE_REG_MODE(arm->core_cache,
 				arm_algorithm_info->core_mode, i).value, 0, 32, context[i]);
 			ARMV4_5_CORE_REG_MODE(arm->core_cache, arm_algorithm_info->core_mode,
-				i).valid = 1;
+				i).valid = true;
 			ARMV4_5_CORE_REG_MODE(arm->core_cache, arm_algorithm_info->core_mode,
-				i).dirty = 1;
+				i).dirty = true;
 		}
 	}
 
 	arm_set_cpsr(arm, cpsr);
-	arm->cpsr->dirty = 1;
+	arm->cpsr->dirty = true;
 
 	arm->core_state = core_state;
 
@@ -1529,7 +1584,7 @@ cleanup:
  *
  */
 int arm_blank_check_memory(struct target *target,
-	target_addr_t address, uint32_t count, uint32_t *blank, uint8_t erased_value)
+	struct target_memory_check_block *blocks, int num_blocks, uint8_t erased_value)
 {
 	struct working_area *check_algorithm;
 	struct reg_param reg_params[3];
@@ -1572,10 +1627,10 @@ int arm_blank_check_memory(struct target *target,
 	arm_algo.core_state = ARM_STATE_ARM;
 
 	init_reg_param(&reg_params[0], "r0", 32, PARAM_OUT);
-	buf_set_u32(reg_params[0].value, 0, 32, address);
+	buf_set_u32(reg_params[0].value, 0, 32, blocks[0].address);
 
 	init_reg_param(&reg_params[1], "r1", 32, PARAM_OUT);
-	buf_set_u32(reg_params[1].value, 0, 32, count);
+	buf_set_u32(reg_params[1].value, 0, 32, blocks[0].size);
 
 	init_reg_param(&reg_params[2], "r2", 32, PARAM_IN_OUT);
 	buf_set_u32(reg_params[2].value, 0, 32, erased_value);
@@ -1590,7 +1645,7 @@ int arm_blank_check_memory(struct target *target,
 			10000, &arm_algo);
 
 	if (retval == ERROR_OK)
-		*blank = buf_get_u32(reg_params[2].value, 0, 32);
+		blocks[0].result = buf_get_u32(reg_params[2].value, 0, 32);
 
 	destroy_reg_param(&reg_params[0]);
 	destroy_reg_param(&reg_params[1]);
@@ -1599,7 +1654,10 @@ int arm_blank_check_memory(struct target *target,
 cleanup:
 	target_free_working_area(target, check_algorithm);
 
-	return retval;
+	if (retval != ERROR_OK)
+		return retval;
+
+	return 1;       /* only one block has been checked */
 }
 
 static int arm_full_context(struct target *target)

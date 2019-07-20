@@ -174,7 +174,7 @@ target_to_armv7m(struct target *target)
 	return container_of(target->arch_info, struct armv7m_common, arm);
 }
 
-static inline bool is_armv7m(struct armv7m_common *armv7m)
+static inline bool is_armv7m(const struct armv7m_common *armv7m)
 {
 	return armv7m->common_magic == ARMV7M_COMMON_MAGIC;
 }
@@ -225,7 +225,7 @@ int armv7m_restore_context(struct target *target);
 int armv7m_checksum_memory(struct target *target,
 		target_addr_t address, uint32_t count, uint32_t *checksum);
 int armv7m_blank_check_memory(struct target *target,
-		target_addr_t address, uint32_t count, uint32_t *blank, uint8_t erased_value);
+		struct target_memory_check_block *blocks, int num_blocks, uint8_t erased_value);
 
 int armv7m_maybe_skip_bkpt_inst(struct target *target, bool *inst_found);
 

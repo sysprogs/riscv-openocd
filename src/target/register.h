@@ -25,12 +25,14 @@
 struct target;
 
 enum reg_type {
+	REG_TYPE_BOOL,
 	REG_TYPE_INT,
 	REG_TYPE_INT8,
 	REG_TYPE_INT16,
 	REG_TYPE_INT32,
 	REG_TYPE_INT64,
 	REG_TYPE_INT128,
+	REG_TYPE_UINT,
 	REG_TYPE_UINT8,
 	REG_TYPE_UINT16,
 	REG_TYPE_UINT32,
@@ -66,6 +68,7 @@ struct reg_data_type_union {
 struct reg_data_type_bitfield {
 	uint32_t start;
 	uint32_t end;
+	enum reg_type type;
 };
 
 struct reg_data_type_struct_field {
@@ -114,9 +117,9 @@ struct reg_data_type {
 };
 
 struct reg {
-	/** Canonical name of the register. */
+	/* Canonical name of the register. */
 	const char *name;
-	/** Number that gdb uses to access this register. */
+	/* Number that gdb uses to access this register. */
 	uint32_t number;
 	/* TODO. This should probably be const. */
 	struct reg_feature *feature;
@@ -156,6 +159,8 @@ struct reg_arch_type {
 	int (*set)(struct reg *reg, uint8_t *buf);
 };
 
+struct reg *register_get_by_number(struct reg_cache *first,
+		uint32_t reg_num, bool search_all);
 struct reg *register_get_by_name(struct reg_cache *first,
 		const char *name, bool search_all);
 struct reg_cache **register_get_last_cache_p(struct reg_cache **first);

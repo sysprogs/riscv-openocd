@@ -84,9 +84,18 @@ struct target_type {
 	 * "halt".
 	 *
 	 * reset run; halt
-     */
+	 */
 	int (*deassert_reset)(struct target *target);
 	int (*soft_reset_halt)(struct target *target);
+
+	/**
+	 * Target architecture for GDB.
+	 *
+	 * The string returned by this function will not be automatically freed;
+	 * if dynamic allocation is used for this value, it must be managed by
+	 * the target, ideally by caching the result for subsequent calls.
+	 */
+	const char *(*get_gdb_arch)(struct target *target);
 
 	/**
 	 * Target register access for GDB.  Do @b not call this function
@@ -101,6 +110,13 @@ struct target_type {
 	 */
 	int (*get_gdb_reg_list)(struct target *target, struct reg **reg_list[],
 			int *reg_list_size, enum target_register_class reg_class);
+
+	/**
+	 * Same as get_gdb_reg_list, but doesn't read the register values.
+	 * */
+	int (*get_gdb_reg_list_noread)(struct target *target,
+			struct reg **reg_list[], int *reg_list_size,
+			enum target_register_class reg_class);
 
 	/* target memory access
 	* size: 1 = byte (8bit), 2 = half-word (16bit), 4 = word (32bit)
@@ -130,8 +146,9 @@ struct target_type {
 
 	int (*checksum_memory)(struct target *target, target_addr_t address,
 			uint32_t count, uint32_t *checksum);
-	int (*blank_check_memory)(struct target *target, target_addr_t address,
-			uint32_t count, uint32_t *blank, uint8_t erased_value);
+	int (*blank_check_memory)(struct target *target,
+			struct target_memory_check_block *blocks, int num_blocks,
+			uint8_t erased_value);
 
 	/*
 	 * target break-/watchpoint control
@@ -274,6 +291,11 @@ struct target_type {
 	 */
 	int (*profiling)(struct target *target, uint32_t *samples,
 			uint32_t max_num_samples, uint32_t *num_samples, uint32_t seconds);
+
+	/* Return the number of address bits this target supports. This will
+	 * typically be 32 for 32-bit targets, and 64 for 64-bit targets. If not
+	 * implemented, it's assumed to be 32. */
+	unsigned (*address_bits)(struct target *target);
 };
 
 #endif /* OPENOCD_TARGET_TARGET_TYPE_H */

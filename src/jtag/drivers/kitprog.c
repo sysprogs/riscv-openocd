@@ -657,6 +657,7 @@ static int kitprog_swd_switch_seq(enum swd_special_seq seq)
 				LOG_DEBUG("JTAG to SWD not supported");
 				/* Fall through to fix target reset issue */
 			}
+			/* fallthrough */
 		case LINE_RESET:
 			LOG_DEBUG("SWD line reset");
 			if (kitprog_swd_seq(SEQUENCE_LINE_RESET) != ERROR_OK)
@@ -680,7 +681,7 @@ static int kitprog_swd_run_queue(void)
 	uint8_t *buffer = kitprog_handle->packet_buffer;
 
 	do {
-		LOG_DEBUG("Executing %d queued transactions", pending_transfer_count);
+		LOG_DEBUG_IO("Executing %d queued transactions", pending_transfer_count);
 
 		if (queued_retval != ERROR_OK) {
 			LOG_DEBUG("Skipping due to previous errors: %d", queued_retval);
@@ -713,12 +714,10 @@ static int kitprog_swd_run_queue(void)
 				data &= ~CORUNDETECT;
 			}
 
-#if 0
-			LOG_DEBUG("%s %s reg %x %"PRIx32,
+			LOG_DEBUG_IO("%s %s reg %x %"PRIx32,
 					cmd & SWD_CMD_APnDP ? "AP" : "DP",
 					cmd & SWD_CMD_RnW ? "read" : "write",
 				  (cmd & SWD_CMD_A32) >> 1, data);
-#endif
 
 			buffer[write_count++] = (cmd | SWD_CMD_START | SWD_CMD_PARK) & ~SWD_CMD_STOP;
 			read_count++;
@@ -742,12 +741,22 @@ static int kitprog_swd_run_queue(void)
 			break;
 		}
 
-		/* We use the maximum buffer size here because the KitProg sometimes
-		 * doesn't like bulk reads of fewer than 62 bytes. (?!?!)
+		/* KitProg firmware does not send a zero length packet
+		 * after the bulk-in transmission of a length divisible by bulk packet
+		 * size (64 bytes) as required by the USB specification.
+		 * Therefore libusb would wait for continuation of transmission.
+		 * Workaround: Limit bulk read size to expected number of bytes
+		 * for problematic tranfer sizes. Otherwise use the maximum buffer
+		 * size here because the KitProg sometimes doesn't like bulk reads
+		 * of fewer than 62 bytes. (?!?!)
 		 */
+		size_t read_count_workaround = SWD_MAX_BUFFER_LENGTH;
+		if (read_count % 64 == 0)
+			read_count_workaround = read_count;
+
 		ret = jtag_libusb_bulk_read(kitprog_handle->usb_handle,
 				BULK_EP_IN | LIBUSB_ENDPOINT_IN, (char *)buffer,
-				SWD_MAX_BUFFER_LENGTH, 0);
+				read_count_workaround, 1000);
 		if (ret > 0) {
 			/* Handle garbage data by offsetting the initial read index */
 			if ((unsigned int)ret > read_count)
@@ -763,9 +772,7 @@ static int kitprog_swd_run_queue(void)
 			if (pending_transfers[i].cmd & SWD_CMD_RnW) {
 				uint32_t data = le_to_h_u32(&buffer[read_index]);
 
-#if 0
-				LOG_DEBUG("Read result: %"PRIx32, data);
-#endif
+				LOG_DEBUG_IO("Read result: %"PRIx32, data);
 
 				if (pending_transfers[i].buffer)
 					*(uint32_t *)pending_transfers[i].buffer = data;
@@ -881,13 +888,11 @@ COMMAND_HANDLER(kitprog_handle_acquire_psoc_command)
 COMMAND_HANDLER(kitprog_handle_serial_command)
 {
 	if (CMD_ARGC == 1) {
-		size_t len = strlen(CMD_ARGV[0]);
-		kitprog_serial = calloc(len + 1, sizeof(char));
+		kitprog_serial = strdup(CMD_ARGV[0]);
 		if (kitprog_serial == NULL) {
 			LOG_ERROR("Failed to allocate memory for the serial number");
 			return ERROR_FAIL;
 		}
-		strncpy(kitprog_serial, CMD_ARGV[0], len + 1);
 	} else {
 		LOG_ERROR("expected exactly one argument to kitprog_serial <serial-number>");
 		return ERROR_FAIL;

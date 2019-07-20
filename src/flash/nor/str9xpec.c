@@ -1195,7 +1195,7 @@ static const struct command_registration str9xpec_command_handlers[] = {
 	COMMAND_REGISTRATION_DONE
 };
 
-struct flash_driver str9xpec_flash = {
+const struct flash_driver str9xpec_flash = {
 	.name = "str9xpec",
 	.commands = str9xpec_command_handlers,
 	.flash_bank_command = str9xpec_flash_bank_command,
@@ -1207,4 +1207,5 @@ struct flash_driver str9xpec_flash = {
 	.auto_probe = str9xpec_probe,
 	.erase_check = str9xpec_erase_check,
 	.protect_check = str9xpec_protect_check,
+	.free_driver_priv = default_flash_free_driver_priv,
 };

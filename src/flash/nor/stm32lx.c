@@ -146,7 +146,7 @@ static const struct stm32lx_rev stm32_425_revs[] = {
 	{ 0x1000, "A" }, { 0x2000, "B" }, { 0x2008, "Y" },
 };
 static const struct stm32lx_rev stm32_427_revs[] = {
-	{ 0x1000, "A" }, { 0x1018, "Y" }, { 0x1038, "X" },
+	{ 0x1000, "A" }, { 0x1018, "Y" }, { 0x1038, "X" }, { 0x10f8, "V" },
 };
 static const struct stm32lx_rev stm32_429_revs[] = {
 	{ 0x1000, "A" }, { 0x1018, "Z" },
@@ -424,13 +424,6 @@ static int stm32lx_erase(struct flash_bank *bank, int first, int last)
 	return ERROR_OK;
 }
 
-static int stm32lx_protect(struct flash_bank *bank, int set, int first,
-		int last)
-{
-	LOG_WARNING("protection of the STM32L flash is not implemented");
-	return ERROR_OK;
-}
-
 static int stm32lx_write_half_pages(struct flash_bank *bank, const uint8_t *buffer,
 		uint32_t offset, uint32_t count)
 {
@@ -448,10 +441,8 @@ static int stm32lx_write_half_pages(struct flash_bank *bank, const uint8_t *buff
 
 	int retval = ERROR_OK;
 
-	/* see contib/loaders/flash/stm32lx.S for src */
-
 	static const uint8_t stm32lx_flash_write_code[] = {
-			0x92, 0x00, 0x8A, 0x18, 0x01, 0xE0, 0x08, 0xC9, 0x08, 0xC0, 0x91, 0x42, 0xFB, 0xD1, 0x00, 0xBE
+#include "../../../contrib/loaders/flash/stm32/stm32lx.inc"
 	};
 
 	/* Make sure we're performing a half-page aligned write. */
@@ -726,16 +717,13 @@ reset_pg_and_lock:
 
 static int stm32lx_read_id_code(struct target *target, uint32_t *id)
 {
-	/* read stm32 device id register */
-	int retval = target_read_u32(target, DBGMCU_IDCODE, id);
-	if (retval != ERROR_OK)
-		return retval;
-
-	/* STM32L0 parts will have 0 there, try reading the L0's location for
-	 * DBG_IDCODE in case this is an L0 part. */
-	if (*id == 0)
+	struct armv7m_common *armv7m = target_to_armv7m(target);
+	int retval;
+	if (armv7m->arm.is_armv6m == true)
 		retval = target_read_u32(target, DBGMCU_IDCODE_L0, id);
-
+	else
+	/* read stm32 device id register */
+		retval = target_read_u32(target, DBGMCU_IDCODE, id);
 	return retval;
 }
 
@@ -828,8 +816,9 @@ static int stm32lx_probe(struct flash_bank *bank)
 			/* This is the first bank */
 			flash_size_in_kb = stm32lx_info->part_info.first_bank_size_kb;
 		} else {
-			LOG_WARNING("STM32L flash bank base address config is incorrect."
-				    " 0x%" PRIx32 " but should rather be 0x%" PRIx32 " or 0x%" PRIx32,
+			LOG_WARNING("STM32L flash bank base address config is incorrect. "
+					TARGET_ADDR_FMT " but should rather be 0x%" PRIx32
+					" or 0x%" PRIx32,
 						bank->base, base_address, second_bank_base);
 			return ERROR_FAIL;
 		}
@@ -867,7 +856,7 @@ static int stm32lx_probe(struct flash_bank *bank)
 		bank->sectors[i].offset = i * FLASH_SECTOR_SIZE;
 		bank->sectors[i].size = FLASH_SECTOR_SIZE;
 		bank->sectors[i].is_erased = -1;
-		bank->sectors[i].is_protected = 1;
+		bank->sectors[i].is_protected = -1;
 	}
 
 	stm32lx_info->probed = 1;
@@ -955,12 +944,11 @@ static const struct command_registration stm32lx_command_handlers[] = {
 	COMMAND_REGISTRATION_DONE
 };
 
-struct flash_driver stm32lx_flash = {
+const struct flash_driver stm32lx_flash = {
 		.name = "stm32lx",
 		.commands = stm32lx_command_handlers,
 		.flash_bank_command = stm32lx_flash_bank_command,
 		.erase = stm32lx_erase,
-		.protect = stm32lx_protect,
 		.write = stm32lx_write,
 		.read = default_flash_read,
 		.probe = stm32lx_probe,
@@ -968,6 +956,7 @@ struct flash_driver stm32lx_flash = {
 		.erase_check = default_flash_blank_check,
 		.protect_check = stm32lx_protect_check,
 		.info = stm32lx_get_info,
+		.free_driver_priv = default_flash_free_driver_priv,
 };
 
 /* Static methods implementation */

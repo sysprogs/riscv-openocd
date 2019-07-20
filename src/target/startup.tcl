@@ -203,6 +203,7 @@ proc init_target_events {} {
 	foreach t $targets {
 		set_default_target_event $t gdb-flash-erase-start "reset init"
 		set_default_target_event $t gdb-flash-write-end "reset halt"
+		set_default_target_event $t gdb-attach "halt"
 	}
 }
 
@@ -219,4 +220,10 @@ proc cortex_m3 args {
 proc cortex_a8 args {
 	echo "DEPRECATED! use 'cortex_a' not 'cortex_a8'"
 	eval cortex_a $args
+}
+
+# deprecated ftdi cmds
+proc ftdi_location args {
+	echo "DEPRECATED! use 'adapter usb location' not 'ftdi_location'"
+	eval adapter usb location $args
 }

@@ -42,6 +42,7 @@
 #endif
 
 #include <helper/time_support.h>
+#include "transport/transport.h"
 
 /**
  * @file
@@ -893,7 +894,7 @@ static const struct command_registration jtag_subcommand_handlers[] = {
 	},
 	{
 		.name = "configure",
-		.mode = COMMAND_EXEC,
+		.mode = COMMAND_ANY,
 		.jim_handler = jim_jtag_configure,
 		.help = "Provide a Tcl handler for the specified "
 			"TAP event.",

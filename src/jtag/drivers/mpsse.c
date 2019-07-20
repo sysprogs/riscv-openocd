@@ -22,6 +22,7 @@
 
 #include "mpsse.h"
 #include "helper/log.h"
+#include "helper/time_support.h"
 #include <libusb.h>
 
 /* Compatibility define for older libusb-1.0 */
@@ -120,7 +121,7 @@ static bool device_location_equal(libusb_device *device, const char *location)
 
 	LOG_DEBUG("device path has %i steps", path_len);
 
-	ptr = strtok(loc, ":");
+	ptr = strtok(loc, "-:");
 	if (ptr == NULL) {
 		LOG_DEBUG("no ':' in path");
 		goto done;
@@ -132,7 +133,7 @@ static bool device_location_equal(libusb_device *device, const char *location)
 
 	path_step = 0;
 	while (path_step < 7) {
-		ptr = strtok(NULL, ",");
+		ptr = strtok(NULL, ".,");
 		if (ptr == NULL) {
 			LOG_DEBUG("no more tokens in path at step %i", path_step);
 			break;
@@ -335,7 +336,13 @@ struct mpsse_ctx *mpsse_open(const uint16_t *vid, const uint16_t *pid, const cha
 	ctx->write_size = 16384;
 	ctx->read_chunk = malloc(ctx->read_chunk_size);
 	ctx->read_buffer = malloc(ctx->read_size);
-	ctx->write_buffer = malloc(ctx->write_size);
+
+	/* Use calloc to make valgrind happy: buffer_write() sets payload
+	 * on bit basis, so some bits can be left uninitialized in write_buffer.
+	 * Although this is perfectly ok with MPSSE, valgrind reports
+	 * Syscall param ioctl(USBDEVFS_SUBMITURB).buffer points to uninitialised byte(s) */
+	ctx->write_buffer = calloc(1, ctx->write_size);
+
 	if (!ctx->read_chunk || !ctx->read_buffer || !ctx->write_buffer)
 		goto error;
 
@@ -886,6 +893,7 @@ int mpsse_flush(struct mpsse_ctx *ctx)
 	}
 
 	/* Polling loop, more or less taken from libftdi */
+	int64_t start = timeval_ms();
 	while (!write_result.done || !read_result.done) {
 		struct timeval timeout_usb;
 
@@ -907,6 +915,11 @@ int mpsse_flush(struct mpsse_ctx *ctx)
 				if (retval != LIBUSB_SUCCESS)
 					break;
 			}
+		}
+
+		if (timeval_ms() - start > 2000) {
+			LOG_ERROR("Timed out handling USB events in mpsse_flush().");
+			break;
 		}
 	}
 

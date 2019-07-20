@@ -929,7 +929,7 @@ static const struct command_registration em357_command_handlers[] = {
 	COMMAND_REGISTRATION_DONE
 };
 
-struct flash_driver em357_flash = {
+const struct flash_driver em357_flash = {
 	.name = "em357",
 	.commands = em357_command_handlers,
 	.flash_bank_command = em357_flash_bank_command,
@@ -941,4 +941,5 @@ struct flash_driver em357_flash = {
 	.auto_probe = em357_auto_probe,
 	.erase_check = default_flash_blank_check,
 	.protect_check = em357_protect_check,
+	.free_driver_priv = default_flash_free_driver_priv,
 };

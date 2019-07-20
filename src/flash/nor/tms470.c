@@ -151,6 +151,7 @@ static int tms470_read_part_info(struct flash_bank *bank)
 	if (bank->sectors) {
 		free(bank->sectors);
 		bank->sectors = NULL;
+		bank->num_sectors = 0;
 	}
 
 	/*
@@ -164,7 +165,8 @@ static int tms470_read_part_info(struct flash_bank *bank)
 			part_name = "TMS470R1A256";
 
 			if (bank->base >= 0x00040000) {
-				LOG_ERROR("No %s flash bank contains base address 0x%08" PRIx32 ".",
+				LOG_ERROR("No %s flash bank contains base address "
+						TARGET_ADDR_FMT ".",
 						part_name,
 						bank->base);
 				return ERROR_FLASH_OPERATION_FAILED;
@@ -203,7 +205,7 @@ static int tms470_read_part_info(struct flash_bank *bank)
 				(void)memcpy(bank->sectors, TMS470R1A288_BANK1_SECTORS,
 						sizeof(TMS470R1A288_BANK1_SECTORS));
 			} else {
-				LOG_ERROR("No %s flash bank contains base address 0x%08" PRIx32 ".",
+				LOG_ERROR("No %s flash bank contains base address " TARGET_ADDR_FMT ".",
 						part_name, bank->base);
 				return ERROR_FLASH_OPERATION_FAILED;
 			}
@@ -243,7 +245,7 @@ static int tms470_read_part_info(struct flash_bank *bank)
 				(void)memcpy(bank->sectors, TMS470R1A384_BANK2_SECTORS,
 						sizeof(TMS470R1A384_BANK2_SECTORS));
 			} else {
-				LOG_ERROR("No %s flash bank contains base address 0x%08" PRIx32 ".",
+				LOG_ERROR("No %s flash bank contains base address " TARGET_ADDR_FMT ".",
 						part_name, bank->base);
 				return ERROR_FLASH_OPERATION_FAILED;
 			}
@@ -754,9 +756,6 @@ static int tms470_erase_sector(struct flash_bank *bank, int sector)
 	target_write_u32(target, 0xFFFFFFDC, glbctrl);
 	LOG_DEBUG("set glbctrl = 0x%08" PRIx32 "", glbctrl);
 
-	if (result == ERROR_OK)
-		bank->sectors[sector].is_erased = 1;
-
 	return result;
 }
 
@@ -902,8 +901,8 @@ static int tms470_write(struct flash_bank *bank, const uint8_t *buffer, uint32_t
 
 	tms470_read_part_info(bank);
 
-	LOG_INFO("Writing %" PRId32 " bytes starting at 0x%08" PRIx32 "", count, bank->base +
-		offset);
+	LOG_INFO("Writing %" PRId32 " bytes starting at " TARGET_ADDR_FMT,
+			count, bank->base + offset);
 
 	/* set GLBCTRL.4  */
 	target_read_u32(target, 0xFFFFFFDC, &glbctrl);
@@ -1044,27 +1043,17 @@ static int tms470_erase_check(struct flash_bank *bank)
 	 * an attempt to reduce the JTAG overhead.
 	 */
 	for (sector = 0; sector < bank->num_sectors; sector++) {
-		if (bank->sectors[sector].is_erased != 1) {
-			uint32_t i, addr = bank->base + bank->sectors[sector].offset;
+		uint32_t i, addr = bank->base + bank->sectors[sector].offset;
 
-			LOG_INFO("checking flash bank %d sector %d", tms470_info->ordinal, sector);
+		LOG_INFO("checking flash bank %d sector %d", tms470_info->ordinal, sector);
 
-			target_read_buffer(target, addr, bank->sectors[sector].size, buffer);
+		target_read_buffer(target, addr, bank->sectors[sector].size, buffer);
 
-			bank->sectors[sector].is_erased = 1;
-			for (i = 0; i < bank->sectors[sector].size; i++) {
-				if (buffer[i] != 0xff) {
-					LOG_WARNING("tms470 bank %d, sector %d, not erased.",
-						tms470_info->ordinal,
-						sector);
-					LOG_WARNING(
-						"at location 0x%08" PRIx32 ": flash data is 0x%02x.",
-						addr + i,
-						buffer[i]);
-
-					bank->sectors[sector].is_erased = 0;
-					break;
-				}
+		bank->sectors[sector].is_erased = 1;
+		for (i = 0; i < bank->sectors[sector].size; i++) {
+			if (buffer[i] != 0xff) {
+				bank->sectors[sector].is_erased = 0;
+				break;
 			}
 		}
 		if (bank->sectors[sector].is_erased != 1) {
@@ -1173,7 +1162,7 @@ FLASH_BANK_COMMAND_HANDLER(tms470_flash_bank_command)
 	return ERROR_OK;
 }
 
-struct flash_driver tms470_flash = {
+const struct flash_driver tms470_flash = {
 	.name = "tms470",
 	.commands = tms470_command_handlers,
 	.flash_bank_command = tms470_flash_bank_command,
@@ -1186,4 +1175,5 @@ struct flash_driver tms470_flash = {
 	.erase_check = tms470_erase_check,
 	.protect_check = tms470_protect_check,
 	.info = get_tms470_info,
+	.free_driver_priv = default_flash_free_driver_priv,
 };

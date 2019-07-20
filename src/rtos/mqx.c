@@ -244,9 +244,9 @@ static int mqx_is_scheduler_running(
 }
 
 /*
- * API function, return 1 if MQX is present
+ * API function, return true if MQX is present
  */
-static int mqx_detect_rtos(
+static bool mqx_detect_rtos(
 	struct target *target
 )
 {
@@ -254,9 +254,9 @@ static int mqx_detect_rtos(
 		(target->rtos->symbols != NULL) &&
 		(target->rtos->symbols[mqx_VAL_mqx_kernel_data].address != 0)
 	) {
-		return 1;
+		return true;
 	}
-	return 0;
+	return false;
 }
 
 /*
@@ -456,7 +456,8 @@ static int mqx_update_threads(
 static int mqx_get_thread_reg_list(
 	struct rtos *rtos,
 	int64_t thread_id,
-	char **hex_reg_list
+	struct rtos_reg **reg_list,
+	int *num_regs
 )
 {
 	int64_t stack_ptr = 0;
@@ -465,7 +466,6 @@ static int mqx_get_thread_reg_list(
 	uint32_t task_queue_size = 0;
 	uint32_t kernel_data_addr = 0;
 
-	*hex_reg_list = NULL;
 	if (thread_id == 0) {
 		LOG_ERROR("MQX RTOS - invalid threadid: 0x%X", (int)thread_id);
 		return ERROR_FAIL;
@@ -535,7 +535,7 @@ static int mqx_get_thread_reg_list(
 		return ERROR_FAIL;
 	}
 	return rtos_generic_stack_read(
-		rtos->target, ((struct mqx_params *)rtos->rtos_specific_params)->stacking_info, stack_ptr, hex_reg_list
+		rtos->target, ((struct mqx_params *)rtos->rtos_specific_params)->stacking_info, stack_ptr, reg_list, num_regs
 	);
 }
 

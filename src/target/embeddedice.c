@@ -28,6 +28,7 @@
 
 #include "embeddedice.h"
 #include "register.h"
+#include <helper/time_support.h>
 
 /**
  * @file
@@ -204,8 +205,8 @@ struct reg_cache *embeddedice_build_reg_cache(struct target *target,
 	for (i = 0; i < num_regs; i++) {
 		reg_list[i].name = eice_regs[i].name;
 		reg_list[i].size = eice_regs[i].width;
-		reg_list[i].dirty = 0;
-		reg_list[i].valid = 0;
+		reg_list[i].dirty = false;
+		reg_list[i].valid = false;
 		reg_list[i].value = calloc(1, 4);
 		reg_list[i].arch_info = &arch_info[i];
 		reg_list[i].type = &eice_reg_type;
@@ -469,8 +470,8 @@ void embeddedice_set_reg(struct reg *reg, uint32_t value)
 	embeddedice_write_reg(reg, value);
 
 	buf_set_u32(reg->value, 0, reg->size, value);
-	reg->valid = 1;
-	reg->dirty = 0;
+	reg->valid = true;
+	reg->dirty = false;
 
 }
 
@@ -576,8 +577,8 @@ int embeddedice_handshake(struct arm_jtag *jtag_info, int hsbit, uint32_t timeou
 	uint8_t field2_out[1];
 	int retval;
 	uint32_t hsact;
-	struct timeval lap;
 	struct timeval now;
+	struct timeval timeout_end;
 
 	if (hsbit == EICE_COMM_CTRL_WBIT)
 		hsact = 1;
@@ -610,7 +611,8 @@ int embeddedice_handshake(struct arm_jtag *jtag_info, int hsbit, uint32_t timeou
 	fields[2].in_value = NULL;
 
 	jtag_add_dr_scan(jtag_info->tap, 3, fields, TAP_IDLE);
-	gettimeofday(&lap, NULL);
+	gettimeofday(&timeout_end, NULL);
+	timeval_add_time(&timeout_end, 0, timeout * 1000);
 	do {
 		jtag_add_dr_scan(jtag_info->tap, 3, fields, TAP_IDLE);
 		retval = jtag_execute_queue();
@@ -621,8 +623,7 @@ int embeddedice_handshake(struct arm_jtag *jtag_info, int hsbit, uint32_t timeou
 			return ERROR_OK;
 
 		gettimeofday(&now, NULL);
-	} while ((uint32_t)((now.tv_sec - lap.tv_sec) * 1000
-			+ (now.tv_usec - lap.tv_usec) / 1000) <= timeout);
+	} while (timeval_compare(&now, &timeout_end) <= 0);
 
 	LOG_ERROR("embeddedice handshake timeout");
 	return ERROR_TARGET_TIMEOUT;

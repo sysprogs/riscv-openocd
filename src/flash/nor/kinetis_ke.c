@@ -478,14 +478,13 @@ int kinetis_ke_stop_watchdog(struct target *target)
 			watchdog_algorithm->address, 0, 100000, &armv7m_info);
 	if (retval != ERROR_OK) {
 		LOG_ERROR("Error executing Kinetis KE watchdog algorithm");
-		retval = ERROR_FAIL;
 	} else {
 		LOG_INFO("Watchdog stopped");
 	}
 
 	target_free_working_area(target, watchdog_algorithm);
 
-	return ERROR_OK;
+	return retval;
 }
 
 COMMAND_HANDLER(kinetis_ke_disable_wdog_handler)
@@ -1176,7 +1175,7 @@ static int kinetis_ke_auto_probe(struct flash_bank *bank)
 static int kinetis_ke_info(struct flash_bank *bank, char *buf, int buf_size)
 {
 	(void) snprintf(buf, buf_size,
-			"%s driver for flash bank %s at 0x%8.8" PRIx32 "",
+			"%s driver for flash bank %s at " TARGET_ADDR_FMT,
 			bank->driver->name,	bank->name, bank->base);
 
 	return ERROR_OK;
@@ -1298,7 +1297,7 @@ static const struct command_registration kinetis_ke_command_handler[] = {
 	COMMAND_REGISTRATION_DONE
 };
 
-struct flash_driver kinetis_ke_flash = {
+const struct flash_driver kinetis_ke_flash = {
 	.name = "kinetis_ke",
 	.commands = kinetis_ke_command_handler,
 	.flash_bank_command = kinetis_ke_flash_bank_command,
@@ -1311,4 +1310,5 @@ struct flash_driver kinetis_ke_flash = {
 	.erase_check = kinetis_ke_blank_check,
 	.protect_check = kinetis_ke_protect_check,
 	.info = kinetis_ke_info,
+	.free_driver_priv = default_flash_free_driver_priv,
 };

@@ -88,7 +88,6 @@ static int jsp_new_connection(struct connection *connection)
 	telnet_connection->closed = 0;
 	telnet_connection->line_size = 0;
 	telnet_connection->line_cursor = 0;
-	telnet_connection->option_size = 0;
 	telnet_connection->state = TELNET_STATE_DATA;
 
 	/* negotiate telnet options */
@@ -102,7 +101,8 @@ static int jsp_new_connection(struct connection *connection)
 
 	jsp_service->connection = connection;
 
-	int retval = target_register_timer_callback(&jsp_poll_read, 1, 1, jsp_service);
+	int retval = target_register_timer_callback(&jsp_poll_read, 1,
+		TARGET_TIMER_TYPE_PERIODIC, jsp_service);
 	if (ERROR_OK != retval)
 		return retval;
 
@@ -243,3 +243,7 @@ int jsp_register_commands(struct command_context *cmd_ctx)
 	return register_commands(cmd_ctx, NULL, jsp_command_handlers);
 }
 
+void jsp_service_free(void)
+{
+	free(jsp_port);
+}

@@ -72,8 +72,8 @@ static const char *dap_reg_name(int instr, int reg_addr)
 		case DP_RDBUFF:
 			reg_name =  "RDBUFF";
 			break;
-		case DP_WCR:
-			reg_name =  "WCR";
+		case DP_DLCR:
+			reg_name =  "DLCR";
 			break;
 		default:
 			reg_name = "UNK";
@@ -553,7 +553,7 @@ static int jtagdp_overrun_check(struct adiv5_dap *dap)
 static int jtagdp_transaction_endcheck(struct adiv5_dap *dap)
 {
 	int retval;
-	uint32_t ctrlstat;
+	uint32_t ctrlstat, pwrmask;
 
 	/* too expensive to call keep_alive() here */
 
@@ -571,9 +571,12 @@ static int jtagdp_transaction_endcheck(struct adiv5_dap *dap)
 	if (ctrlstat & SSTICKYERR) {
 		LOG_DEBUG("jtag-dp: CTRL/STAT 0x%" PRIx32, ctrlstat);
 		/* Check power to debug regions */
-		if ((ctrlstat & (CDBGPWRUPREQ | CDBGPWRUPACK | CSYSPWRUPREQ | CSYSPWRUPACK)) !=
-						(CDBGPWRUPREQ | CDBGPWRUPACK | CSYSPWRUPREQ | CSYSPWRUPACK)) {
+		pwrmask = CDBGPWRUPREQ | CDBGPWRUPACK | CSYSPWRUPREQ;
+		if (!dap->ignore_syspwrupack)
+			pwrmask |= CSYSPWRUPACK;
+		if ((ctrlstat & pwrmask) != pwrmask) {
 			LOG_ERROR("Debug regions are unpowered, an unexpected reset might have happened");
+			dap->do_reconnect = true;
 		}
 
 		if (ctrlstat & SSTICKYERR)
@@ -597,6 +600,20 @@ static int jtagdp_transaction_endcheck(struct adiv5_dap *dap)
 }
 
 /*--------------------------------------------------------------------------*/
+
+static int jtag_connect(struct adiv5_dap *dap)
+{
+	dap->do_reconnect = false;
+	return dap_dp_init(dap);
+}
+
+static int jtag_check_reconnect(struct adiv5_dap *dap)
+{
+	if (dap->do_reconnect)
+		return jtag_connect(dap);
+
+	return ERROR_OK;
+}
 
 static int jtag_dp_q_read(struct adiv5_dap *dap, unsigned reg,
 		uint32_t *data)
@@ -633,7 +650,11 @@ static int jtag_ap_q_bankselect(struct adiv5_ap *ap, unsigned reg)
 static int jtag_ap_q_read(struct adiv5_ap *ap, unsigned reg,
 		uint32_t *data)
 {
-	int retval = jtag_ap_q_bankselect(ap, reg);
+	int retval = jtag_check_reconnect(ap->dap);
+	if (retval != ERROR_OK)
+		return retval;
+
+	retval = jtag_ap_q_bankselect(ap, reg);
 	if (retval != ERROR_OK)
 		return retval;
 
@@ -647,7 +668,11 @@ static int jtag_ap_q_read(struct adiv5_ap *ap, unsigned reg,
 static int jtag_ap_q_write(struct adiv5_ap *ap, unsigned reg,
 		uint32_t data)
 {
-	int retval = jtag_ap_q_bankselect(ap, reg);
+	int retval = jtag_check_reconnect(ap->dap);
+	if (retval != ERROR_OK)
+		return retval;
+
+	retval = jtag_ap_q_bankselect(ap, reg);
 	if (retval != ERROR_OK)
 		return retval;
 
@@ -692,6 +717,7 @@ static int jtag_dp_sync(struct adiv5_dap *dap)
  * part of DAP setup
 */
 const struct dap_ops jtag_dp_ops = {
+	.connect             = jtag_connect,
 	.queue_dp_read       = jtag_dp_q_read,
 	.queue_dp_write      = jtag_dp_q_write,
 	.queue_ap_read       = jtag_ap_q_read,
@@ -700,52 +726,3 @@ const struct dap_ops jtag_dp_ops = {
 	.run                 = jtag_dp_run,
 	.sync                = jtag_dp_sync,
 };
-
-
-static const uint8_t swd2jtag_bitseq[] = {
-	/* More than 50 TCK/SWCLK cycles with TMS/SWDIO high,
-	 * putting both JTAG and SWD logic into reset state.
-	 */
-	0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-	/* Switching equence disables SWD and enables JTAG
-	 * NOTE: bits in the DP's IDCODE can expose the need for
-	 * the old/deprecated sequence (0xae 0xde).
-	 */
-	0x3c, 0xe7,
-	/* At least 50 TCK/SWCLK cycles with TMS/SWDIO high,
-	 * putting both JTAG and SWD logic into reset state.
-	 * NOTE:  some docs say "at least 5".
-	 */
-	0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-};
-
-/** Put the debug link into JTAG mode, if the target supports it.
- * The link's initial mode may be either SWD or JTAG.
- *
- * @param target Enters JTAG mode (if possible).
- *
- * Note that targets implemented with SW-DP do not support JTAG, and
- * that some targets which could otherwise support it may have been
- * configured to disable JTAG signaling
- *
- * @return ERROR_OK or else a fault code.
- */
-int dap_to_jtag(struct target *target)
-{
-	int retval;
-
-	LOG_DEBUG("Enter JTAG mode");
-
-	/* REVISIT it's nasty to need to make calls to a "jtag"
-	 * subsystem if the link isn't in JTAG mode...
-	 */
-
-	retval = jtag_add_tms_seq(8 * sizeof(swd2jtag_bitseq),
-			swd2jtag_bitseq, TAP_RESET);
-	if (retval == ERROR_OK)
-		retval = jtag_execute_queue();
-
-	/* REVISIT set up the DAP's ops vector for JTAG mode. */
-
-	return retval;
-}

@@ -94,7 +94,7 @@
 #define SAMV_PAGE_SIZE                 512
 #define SAMV_FLASH_BASE         0x00400000
 
-extern struct flash_driver atsamv_flash;
+extern const struct flash_driver atsamv_flash;
 
 struct samv_flash_bank {
 	int      probed;
@@ -726,7 +726,7 @@ static const struct command_registration atsamv_command_handlers[] = {
 	COMMAND_REGISTRATION_DONE
 };
 
-struct flash_driver atsamv_flash = {
+const struct flash_driver atsamv_flash = {
 	.name = "atsamv",
 	.commands = atsamv_command_handlers,
 	.flash_bank_command = samv_flash_bank_command,
@@ -739,4 +739,5 @@ struct flash_driver atsamv_flash = {
 	.erase_check = default_flash_blank_check,
 	.protect_check = samv_protect_check,
 	.info = samv_get_info,
+	.free_driver_priv = default_flash_free_driver_priv,
 };

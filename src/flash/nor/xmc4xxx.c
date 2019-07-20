@@ -778,7 +778,7 @@ static int xmc4xxx_write(struct flash_bank *bank, const uint8_t *buffer,
 		memcpy(&tmp_buf[start_pad], buffer, remaining);
 
 		if (end_pad) {
-			LOG_INFO("Padding end of page @%08"PRIx32" by %d bytes",
+			LOG_INFO("Padding end of page @" TARGET_ADDR_FMT " by %d bytes",
 				 bank->base + offset, end_pad);
 			memset(&tmp_buf[256 - end_pad], 0xff, end_pad);
 		}
@@ -931,13 +931,13 @@ static int xmc4xxx_get_info_command(struct flash_bank *bank, char *buf, int buf_
 
 	/* If OTP Write protection is enabled (User 2), list each
 	 * sector that has it enabled */
-	char otp_str[8];
+	char otp_str[14];
 	if (otp_enabled) {
 		strcat(prot_str, "\nOTP Protection is enabled for sectors:\n");
 		for (int i = 0; i < bank->num_sectors; i++) {
 			if (fb->write_prot_otp[i]) {
 				snprintf(otp_str, sizeof(otp_str), "- %d\n", i);
-				strncat(prot_str, otp_str, ARRAY_SIZE(otp_str));
+				strncat(prot_str, otp_str, sizeof(prot_str) - strlen(prot_str) - 1);
 			}
 		}
 	}
@@ -1343,7 +1343,7 @@ static const struct command_registration xmc4xxx_command_handlers[] = {
 	COMMAND_REGISTRATION_DONE
 };
 
-struct flash_driver xmc4xxx_flash = {
+const struct flash_driver xmc4xxx_flash = {
 	.name = "xmc4xxx",
 	.commands = xmc4xxx_command_handlers,
 	.flash_bank_command = xmc4xxx_flash_bank_command,
@@ -1356,4 +1356,5 @@ struct flash_driver xmc4xxx_flash = {
 	.info = xmc4xxx_get_info_command,
 	.protect_check = xmc4xxx_protect_check,
 	.protect = xmc4xxx_protect,
+	.free_driver_priv = default_flash_free_driver_priv,
 };

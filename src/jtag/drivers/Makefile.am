@@ -19,6 +19,7 @@ DRIVERFILES =
 
 # Standard Driver: common files
 DRIVERFILES += %D%/driver.c
+DRIVERFILES += %D%/jtag_usb_common.c
 
 if USE_LIBUSB1
 DRIVERFILES += %D%/libusb1_common.c
@@ -79,6 +80,9 @@ endif
 if USB_BLASTER_DRIVER
 %C%_libocdjtagdrivers_la_LIBADD += %D%/usb_blaster/libocdusbblaster.la
 include %D%/usb_blaster/Makefile.am
+endif
+if FT232R
+DRIVERFILES += %D%/ft232r.c
 endif
 if AMTJTAGACCEL
 DRIVERFILES += %D%/amt_jtagaccel.c
@@ -153,14 +157,17 @@ endif
 if IMX_GPIO
 DRIVERFILES += %D%/imx_gpio.c
 endif
-
 if KITPROG
 DRIVERFILES += %D%/kitprog.c
+endif
+if XDS110
+DRIVERFILES += %D%/xds110.c
 endif
 
 DRIVERHEADERS = \
 	%D%/bitbang.h \
 	%D%/bitq.h \
+	%D%/jtag_usb_common.h \
 	%D%/libusb0_common.h \
 	%D%/libusb1_common.h \
 	%D%/libusb_common.h \

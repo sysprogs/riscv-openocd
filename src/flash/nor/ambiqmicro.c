@@ -888,7 +888,7 @@ static const struct command_registration ambiqmicro_command_handlers[] = {
 	COMMAND_REGISTRATION_DONE
 };
 
-struct flash_driver ambiqmicro_flash = {
+const struct flash_driver ambiqmicro_flash = {
 	.name = "ambiqmicro",
 	.commands = ambiqmicro_command_handlers,
 	.flash_bank_command = ambiqmicro_flash_bank_command,
@@ -901,4 +901,5 @@ struct flash_driver ambiqmicro_flash = {
 	.erase_check = default_flash_blank_check,
 	.protect_check = ambiqmicro_protect_check,
 	.info = get_ambiqmicro_info,
+	.free_driver_priv = default_flash_free_driver_priv,
 };

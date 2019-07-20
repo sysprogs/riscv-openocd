@@ -46,8 +46,13 @@ static void virtual_update_bank_info(struct flash_bank *bank)
 	bank->bus_width = master_bank->bus_width;
 	bank->erased_value = master_bank->erased_value;
 	bank->default_padded_value = master_bank->default_padded_value;
+	bank->write_start_alignment = master_bank->write_start_alignment;
+	bank->write_end_alignment = master_bank->write_end_alignment;
+	bank->minimal_write_gap = master_bank->minimal_write_gap;
 	bank->num_sectors = master_bank->num_sectors;
 	bank->sectors = master_bank->sectors;
+	bank->num_prot_blocks = master_bank->num_prot_blocks;
+	bank->prot_blocks = master_bank->prot_blocks;
 }
 
 FLASH_BANK_COMMAND_HANDLER(virtual_flash_bank_command)
@@ -180,7 +185,7 @@ static int virtual_info(struct flash_bank *bank, char *buf, int buf_size)
 	if (master_bank == NULL)
 		return ERROR_FLASH_OPERATION_FAILED;
 
-	snprintf(buf, buf_size, "%s driver for flash bank %s at 0x%8.8" PRIx32 "",
+	snprintf(buf, buf_size, "%s driver for flash bank %s at " TARGET_ADDR_FMT,
 			bank->driver->name, master_bank->name, master_bank->base);
 
 	return ERROR_OK;
@@ -219,7 +224,7 @@ static int virtual_flash_read(struct flash_bank *bank,
 	return ERROR_OK;
 }
 
-struct flash_driver virtual_flash = {
+const struct flash_driver virtual_flash = {
 	.name = "virtual",
 	.flash_bank_command = virtual_flash_bank_command,
 	.erase = virtual_erase,
@@ -231,4 +236,5 @@ struct flash_driver virtual_flash = {
 	.erase_check = virtual_blank_check,
 	.protect_check = virtual_protect_check,
 	.info = virtual_info,
+	.free_driver_priv = default_flash_free_driver_priv,
 };

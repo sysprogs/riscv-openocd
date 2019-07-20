@@ -557,6 +557,10 @@ static char *__command_name(struct command *c, char delim, unsigned extra)
 	if (NULL == c->parent) {
 		/* allocate enough for the name, child names, and '\0' */
 		name = malloc(len + extra + 1);
+		if (!name) {
+			LOG_ERROR("Out of memory");
+			return NULL;
+		}
 		strcpy(name, c->name);
 	} else {
 		/* parent's extra must include both the space and name */
@@ -575,31 +579,35 @@ char *command_name(struct command *c, char delim)
 
 static bool command_can_run(struct command_context *cmd_ctx, struct command *c)
 {
-	return c->mode == COMMAND_ANY || c->mode == cmd_ctx->mode;
+	if (c->mode == COMMAND_ANY || c->mode == cmd_ctx->mode)
+		return true;
+
+	/* Many commands may be run only before/after 'init' */
+	const char *when;
+	switch (c->mode) {
+		case COMMAND_CONFIG:
+			when = "before";
+			break;
+		case COMMAND_EXEC:
+			when = "after";
+			break;
+		/* handle the impossible with humor; it guarantees a bug report! */
+		default:
+			when = "if Cthulhu is summoned by";
+			break;
+	}
+	char *full_name = command_name(c, ' ');
+	LOG_ERROR("The '%s' command must be used %s 'init'.",
+			full_name ? full_name : c->name, when);
+	free(full_name);
+	return false;
 }
 
 static int run_command(struct command_context *context,
 	struct command *c, const char *words[], unsigned num_words)
 {
-	if (!command_can_run(context, c)) {
-		/* Many commands may be run only before/after 'init' */
-		const char *when;
-		switch (c->mode) {
-			case COMMAND_CONFIG:
-				when = "before";
-				break;
-			case COMMAND_EXEC:
-				when = "after";
-				break;
-			/* handle the impossible with humor; it guarantees a bug report! */
-			default:
-				when = "if Cthulhu is summoned by";
-				break;
-		}
-		LOG_ERROR("The '%s' command must be used %s 'init'.",
-			c->name, when);
+	if (!command_can_run(context, c))
 		return ERROR_FAIL;
-	}
 
 	struct command_invocation cmd = {
 		.ctx = context,
@@ -608,22 +616,40 @@ static int run_command(struct command_context *context,
 		.argc = num_words - 1,
 		.argv = words + 1,
 	};
+	/* Black magic of overridden current target:
+	 * If the command we are going to handle has a target prefix,
+	 * override the current target temporarily for the time
+	 * of processing the command.
+	 * current_target_override is used also for event handlers
+	 * therefore we prevent touching it if command has no prefix.
+	 * Previous override is saved and restored back to ensure
+	 * correct work when run_command() is re-entered. */
+	struct target *saved_target_override = context->current_target_override;
+	if (c->jim_handler_data)
+		context->current_target_override = c->jim_handler_data;
+
 	int retval = c->handler(&cmd);
+
+	if (c->jim_handler_data)
+		context->current_target_override = saved_target_override;
+
 	if (retval == ERROR_COMMAND_SYNTAX_ERROR) {
 		/* Print help for command */
 		char *full_name = command_name(c, ' ');
 		if (NULL != full_name) {
 			command_run_linef(context, "usage %s", full_name);
 			free(full_name);
-		} else
-			retval = -ENOMEM;
+		}
 	} else if (retval == ERROR_COMMAND_CLOSE_CONNECTION) {
 		/* just fall through for a shutdown request */
 	} else if (retval != ERROR_OK) {
 		/* we do not print out an error message because the command *should*
 		 * have printed out an error
 		 */
-		LOG_DEBUG("Command failed with error code %d", retval);
+		char *full_name = command_name(c, ' ');
+		LOG_DEBUG("Command '%s' failed with error code %d",
+					full_name ? full_name : c->name, retval);
+		free(full_name);
 	}
 
 	return retval;
@@ -643,6 +669,8 @@ int command_run_line(struct command_context *context, char *line)
 	 * happen when the Jim Tcl interpreter is provided by eCos for
 	 * instance.
 	 */
+	context->current_target_override = NULL;
+
 	Jim_Interp *interp = context->interp;
 	Jim_DeleteAssocData(interp, "context");
 	retcode = Jim_SetAssocData(interp, "context", NULL, context);
@@ -852,7 +880,7 @@ static COMMAND_HELPER(command_help_show, struct command *c, unsigned n,
 {
 	char *cmd_name = command_name(c, ' ');
 	if (NULL == cmd_name)
-		return -ENOMEM;
+		return ERROR_FAIL;
 
 	/* If the match string occurs anywhere, we print out
 	 * stuff for this command. */
@@ -1008,6 +1036,9 @@ static int command_unknown(Jim_Interp *interp, int argc, Jim_Obj *const *argv)
 	}
 	/* pass the command through to the intended handler */
 	if (c->jim_handler) {
+		if (!command_can_run(cmd_ctx, c))
+			return JIM_ERR;
+
 		interp->cmdPrivData = c->jim_handler_data;
 		return (*c->jim_handler)(interp, count, start);
 	}
@@ -1269,14 +1300,10 @@ static const struct command_registration command_builtin_handlers[] = {
 
 struct command_context *command_init(const char *startup_tcl, Jim_Interp *interp)
 {
-	struct command_context *context = malloc(sizeof(struct command_context));
+	struct command_context *context = calloc(1, sizeof(struct command_context));
 	const char *HostOs;
 
 	context->mode = COMMAND_EXEC;
-	context->commands = NULL;
-	context->current_target = 0;
-	context->output_handler = NULL;
-	context->output_handler_priv = NULL;
 
 	/* Create a jim interpreter if we were not handed one */
 	if (interp == NULL) {
@@ -1337,6 +1364,15 @@ struct command_context *command_init(const char *startup_tcl, Jim_Interp *interp
 	Jim_DeleteAssocData(interp, "context");
 
 	return context;
+}
+
+void command_exit(struct command_context *context)
+{
+	if (!context)
+		return;
+
+	Jim_FreeInterp(context->interp);
+	command_done(context);
 }
 
 int command_context_mode(struct command_context *cmd_ctx, enum command_mode mode)
@@ -1456,8 +1492,8 @@ COMMAND_HELPER(handle_command_parse_bool, bool *out, const char *label)
 				LOG_ERROR("%s: argument '%s' is not valid", CMD_NAME, in);
 				return ERROR_COMMAND_SYNTAX_ERROR;
 			}
-			/* fall through */
 		}
+			/* fallthrough */
 		case 0:
 			LOG_INFO("%s is %s", label, *out ? "enabled" : "disabled");
 			break;
