@@ -21,6 +21,13 @@ static bool riscv_detect_rtos(struct target *target)
 static int riscv_create_rtos(struct target *target)
 {
 	LOG_DEBUG("RISC-V Debug 'RTOS' created: this doesn't mean you're running an RTOS, just that you have multi-hart support on RISC-V");
+	LOG_WARNING("`-rtos riscv` is deprecated! Please change your configuration to use `-rtos");
+	LOG_WARNING("hwthread` instead. To do that, you will have to explicitly list every hart in");
+	LOG_WARNING("the system as a separate target. See");
+	LOG_WARNING("https://github.com/riscv/riscv-tests/blob/ec6537fc4a527ca88be2f045e01c460e640ab9c5/debug/targets/SiFive/HiFiveUnleashed.cfg#L11");
+	LOG_WARNING("for an example.");
+	LOG_WARNING("You will have to change your configuration file in any OpenOCD newer than June");
+	LOG_WARNING("2020.");
 
 	struct riscv_rtos *r = calloc(1, sizeof(*r));
 	target->rtos->rtos_specific_params = r;
@@ -284,25 +291,26 @@ static int riscv_gdb_v_packet(struct connection *connection, const char *packet,
 	if (sscanf(packet_stttrr, "vCont;s:%d;c", &threadid) == 1) {
 		riscv_set_rtos_hartid(target, threadid - 1);
 		riscv_step_rtos_hart(target);
+		/* Stepping changes the current thread to whichever thread was stepped. */
+		target->rtos->current_threadid = threadid;
 
 		gdb_put_packet(connection, "S05", 3);
 		return JIM_OK;
-	}
 
-	if (strcmp(packet_stttrr, "vCont;c") == 0) {
+	} else if (strcmp(packet_stttrr, "vCont;c") == 0) {
 		target_call_event_callbacks(target, TARGET_EVENT_GDB_START);
 		target_call_event_callbacks(target, TARGET_EVENT_RESUME_START);
 		riscv_set_all_rtos_harts(target);
-		riscv_resume(target, 1, 0, 0, 0);
+		riscv_resume(target, 1, 0, 0, 0, false);
 		target->state = TARGET_RUNNING;
 		gdb_set_frontend_state_running(connection);
 		target_call_event_callbacks(target, TARGET_EVENT_RESUMED);
 		target_call_event_callbacks(target, TARGET_EVENT_RESUME_END);
 		return JIM_OK;
-	}
 
-	if (strncmp(packet_stttrr, "vCont", 5) == 0)
+	} else if (strncmp(packet_stttrr, "vCont", 5) == 0) {
 		LOG_ERROR("Got unknown vCont-type packet");
+	}
 
 	return GDB_THREAD_PACKET_NOT_CONSUMED;
 }
