@@ -63,4 +63,5 @@ add_library(ocdflashnor
 	psoc6.c
 	stm32h7x.c
 	w600.c
-	xcf.c)
+	xcf.c
+	swm050.c)

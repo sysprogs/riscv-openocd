@@ -41,7 +41,7 @@ static int riscv_create_rtos(struct target *target)
 	return JIM_OK;
 }
 
-#ifdef _WIN32
+#ifdef _WIN32_HAS_NO_VASPRINTF
 //https://stackoverflow.com/questions/40159892/using-asprintf-on-windows
 
 int vasprintf(char **strp, const char *fmt, va_list ap) {

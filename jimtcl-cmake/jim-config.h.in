@@ -3,7 +3,7 @@
 /* #undef JIM_UTF8 */
 #define JIM_VERSION @JIM_VERSION@
 
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(S_IRWXG)
 #define S_IRWXG 0
 #define S_IRWXO 0
 #endif

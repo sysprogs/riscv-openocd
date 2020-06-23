@@ -4,19 +4,16 @@ project (OpenOCD)
 INCLUDE (CheckIncludeFiles)
 SET(OPENOCD_VERSION 0.10.0)
 
+set(SH_WRAPPER ${CMAKE_CURRENT_SOURCE_DIR}/external/run-sh.bat)
 include(config.cmake)
 
-find_path(LIBUSB1_INCLUDE_DIR libusb.h
-	HINTS ${CMAKE_SYSTEM_INCLUDE_PATH} c:/mingw/include
-	PATH_SUFFIXES libusb-1.0)
-	
-find_path(HIDAPI_INCLUDE_DIR hidapi.h
-	HINTS ${CMAKE_SYSTEM_INCLUDE_PATH} c:/mingw/include
-	PATH_SUFFIXES hidapi)
-	
-add_definitions(-DHAVE_CONFIG_H -DPKGDATADIR="../../share/openocd" -DBINDIR="../../bin")
+add_subdirectory(external/hidapi/scripts)
+add_subdirectory(external/libusb1/scripts)
+add_subdirectory(external/prebuilt)
+
+add_definitions(-DHAVE_CONFIG_H -DPKGDATADIR="../../share/openocd" -DBINDIR="../../bin" -D__USE_MINGW_ANSI_STDIO=1)
 include_directories(${CMAKE_CURRENT_BINARY_DIR} ${LIBUSB1_INCLUDE_DIR} ${HIDAPI_INCLUDE_DIR})
-set(CMAKE_C_FLAGS "-std=gnu99")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu99 -Werror=incompatible-pointer-types")
 
 add_subdirectory(jimtcl-cmake)
 add_subdirectory(src)

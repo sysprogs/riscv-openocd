@@ -1,3 +1,9 @@
 [submodule "jimtcl"]
 	path = jimtcl
 	url = https://github.com/msteveb/jimtcl
+[submodule "external/libusb1/source"]
+	path = external/libusb1/source
+	url = https://github.com/libusb/libusb
+[submodule "external/hidapi/source"]
+	path = external/hidapi/source
+	url = https://github.com/signal11/hidapi
